@@ -9,7 +9,11 @@ import Foundation
 
 final class OAuth2Service {
     static let shared = OAuth2Service()
-    private let decoder = JSONDecoder()
+    private lazy var jsonDecoder: JSONDecoder = {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return decoder
+    }()
     
     private init() {}
     
@@ -26,7 +30,7 @@ final class OAuth2Service {
             switch result {
             case .success(let data):
                 do {
-                    let responseBody = try self.decoder.decode(OAuthTokenResponseBody.self, from: data)
+                    let responseBody = try self.jsonDecoder.decode(OAuthTokenResponseBody.self, from: data)
                     fulfillCompletionOnTheMainThread(.success(responseBody.accessToken))
                 } catch {
                     print("Decode error: \(error.localizedDescription)")
