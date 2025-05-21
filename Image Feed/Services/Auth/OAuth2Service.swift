@@ -9,6 +9,7 @@ import Foundation
 
 final class OAuth2Service {
     static let shared = OAuth2Service()
+    private let decoder = JSONDecoder()
     
     private init() {}
     
@@ -25,12 +26,25 @@ final class OAuth2Service {
             switch result {
             case .success(let data):
                 do {
-                    let responseBody = try JSONDecoder().decode(OAuthTokenResponseBody.self, from: data)
+                    let responseBody = try self.decoder.decode(OAuthTokenResponseBody.self, from: data)
                     fulfillCompletionOnTheMainThread(.success(responseBody.accessToken))
                 } catch {
+                    print("Decode error: \(error.localizedDescription)")
                     fulfillCompletionOnTheMainThread(.failure(error))
                 }
             case .failure(let error):
+                if let error = error as? NetworkError {
+                    switch error {
+                    case .httpStatusCode(let int):
+                        print("Bad status code: \(int)")
+                    case .urlRequestError(let error):
+                        print("URL request error: \(error)")
+                    case .urlSessionError:
+                        print("URL session error")
+                    }
+                } else {
+                    print("Error: \(error.localizedDescription)")
+                }
                 fulfillCompletionOnTheMainThread(.failure(error))
             }
         }
@@ -58,7 +72,7 @@ private extension OAuth2Service {
             return nil
         }
         var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        request.httpMethod = HTTPMethod.post.rawValue
         return request
     }
 }

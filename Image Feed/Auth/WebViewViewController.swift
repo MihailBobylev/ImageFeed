@@ -52,11 +52,12 @@ final class WebViewViewController: UIViewController {
         change: [NSKeyValueChangeKey : Any]?,
         context: UnsafeMutableRawPointer?
     ) {
-        if keyPath == #keyPath(WKWebView.estimatedProgress) {
-            updateProgress()
-        } else {
+        guard keyPath == #keyPath(WKWebView.estimatedProgress) else {
             super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
+            return
         }
+
+        updateProgress()
     }
 }
 
@@ -76,6 +77,7 @@ extension WebViewViewController: WKNavigationDelegate {
 private extension WebViewViewController {
     func loadAuthView() {
         guard var urlComponents = URLComponents(string: WebViewConstants.unsplashAuthorizeURLString) else {
+            print("Error: URLComponents creation error")
             return
         }
         
@@ -87,6 +89,7 @@ private extension WebViewViewController {
         ]
         
         guard let url = urlComponents.url else {
+            print("Error: URL creation error")
             return
         }
         

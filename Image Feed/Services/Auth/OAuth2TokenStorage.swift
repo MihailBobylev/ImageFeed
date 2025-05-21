@@ -12,6 +12,7 @@ final class OAuth2TokenStorage {
         case accessToken
     }
     
+    static let shared = OAuth2TokenStorage()
     private let storage: UserDefaults = .standard
     
     var token: String? {

@@ -13,11 +13,10 @@ protocol AuthViewControllerDelegate: AnyObject {
 
 final class AuthViewController: UIViewController {
     private enum Constants {
-        static let navBackButtonImageName = "nav_back_button"
         static let showWebViewSegueIdentifier = "ShowWebView"
     }
     private let oauth2Service = OAuth2Service.shared
-    private let oauth2TokenStorage = OAuth2TokenStorage()
+    private let oauth2TokenStorage = OAuth2TokenStorage.shared
     
     weak var delegate: AuthViewControllerDelegate?
     
@@ -27,17 +26,17 @@ final class AuthViewController: UIViewController {
     }
     
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        if segue.identifier == Constants.showWebViewSegueIdentifier {
-            guard
-                let webViewViewController = segue.destination as? WebViewViewController
-            else {
-                assertionFailure("Failed to prepare for \(Constants.showWebViewSegueIdentifier)")
-                return
-            }
-            webViewViewController.delegate = self
-        } else {
+        guard segue.identifier == Constants.showWebViewSegueIdentifier else {
             super.prepare(for: segue, sender: sender)
+            return
         }
+        
+        guard let webViewViewController = segue.destination as? WebViewViewController else {
+            assertionFailure("Failed to prepare for \(Constants.showWebViewSegueIdentifier)")
+            return
+        }
+        
+        webViewViewController.delegate = self
     }
 }
 
@@ -54,8 +53,8 @@ extension AuthViewController: WebViewViewControllerDelegate {
 
 private extension AuthViewController {
     func configureBackButton() {
-        navigationController?.navigationBar.backIndicatorImage = UIImage(named: Constants.navBackButtonImageName)
-        navigationController?.navigationBar.backIndicatorTransitionMaskImage = UIImage(named: Constants.navBackButtonImageName)
+        navigationController?.navigationBar.backIndicatorImage = UIImage(resource: .navBackButton)
+        navigationController?.navigationBar.backIndicatorTransitionMaskImage = UIImage(resource: .navBackButton)
         navigationItem.backBarButtonItem = UIBarButtonItem(title: "", style: .plain, target: nil, action: nil)
         navigationItem.backBarButtonItem?.tintColor = .ypBlack
     }
@@ -68,18 +67,7 @@ private extension AuthViewController {
                 oauth2TokenStorage.token = token
                 delegate?.authViewController(self, didAuthenticateWithCode: code)
             case let .failure(error):
-                if let error = error as? NetworkError {
-                    switch error {
-                    case .httpStatusCode(let int):
-                        print("Bad status code: \(int)")
-                    case .urlRequestError(let error):
-                        print("URL request error: \(error)")
-                    case .urlSessionError:
-                        print("URL session error")
-                    }
-                } else {
-                    print("Error: \(error.localizedDescription)")
-                }
+                print("Error: \(error.localizedDescription)")
             }
         }
     }
