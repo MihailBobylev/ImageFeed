@@ -7,52 +7,58 @@
 
 import Foundation
 
+enum AuthServiceError: Error {
+    case invalidRequest
+}
+
 final class OAuth2Service {
     static let shared = OAuth2Service()
     private lazy var jsonDecoder: JSONDecoder = {
         let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
         return decoder
     }()
+    
+    private var myTask: URLSessionTask?
+    private var lastCode: String?
     
     private init() {}
     
     func fetchOAuthToken(_ code: String, completion: @escaping (Result<String, Error>) -> Void) {
-        guard let request = makeOAuthTokenRequest(code: code) else { return }
-        
-        let fulfillCompletionOnTheMainThread: (Result<String, Error>) -> Void = { result in
-            DispatchQueue.main.async {
-                completion(result)
-            }
+        assert(Thread.isMainThread)
+        guard lastCode != code else {
+            completion(.failure(AuthServiceError.invalidRequest))
+            return
         }
         
-        let task = URLSession.shared.data(for: request) { result in
+        myTask?.cancel()
+        lastCode = code
+        
+        guard let request = makeOAuthTokenRequest(code: code) else { return }
+        
+        let task = URLSession.shared.objectTask(for: request) { [weak self] (result: Result<OAuthTokenResponseBody, Error>) in
+            guard let self else { return }
             switch result {
-            case .success(let data):
-                do {
-                    let responseBody = try self.jsonDecoder.decode(OAuthTokenResponseBody.self, from: data)
-                    fulfillCompletionOnTheMainThread(.success(responseBody.accessToken))
-                } catch {
-                    print("Decode error: \(error.localizedDescription)")
-                    fulfillCompletionOnTheMainThread(.failure(error))
-                }
+            case .success(let responseBody):
+                myTask = nil
+                lastCode = nil
+                completion(.success(responseBody.accessToken))
             case .failure(let error):
                 if let error = error as? NetworkError {
                     switch error {
                     case .httpStatusCode(let int):
-                        print("Bad status code: \(int)")
+                        print("[fetchOAuthToken.objectTask]: Bad status code: \(int)")
                     case .urlRequestError(let error):
-                        print("URL request error: \(error)")
+                        print("[fetchOAuthToken.objectTask]: URL request error: \(error)")
                     case .urlSessionError:
-                        print("URL session error")
+                        print("[fetchOAuthToken.objectTask]: URL session error")
                     }
                 } else {
-                    print("Error: \(error.localizedDescription)")
+                    print("[fetchOAuthToken.objectTask]: \(error.localizedDescription)")
                 }
-                fulfillCompletionOnTheMainThread(.failure(error))
+                completion(.failure(error))
             }
         }
-        
+        myTask = task
         task.resume()
     }
 }
@@ -60,7 +66,7 @@ final class OAuth2Service {
 private extension OAuth2Service {
     func makeOAuthTokenRequest(code: String) -> URLRequest? {
         guard let baseURL = URL(string: "https://unsplash.com") else {
-            print("baseURL is incorrect")
+            print("[makeOAuthTokenRequest]: Failed to create URL")
             return nil
         }
         guard let url = URL(
@@ -72,7 +78,7 @@ private extension OAuth2Service {
             + "&&grant_type=authorization_code",
             relativeTo: baseURL
         ) else {
-            print("URL creation error")
+            print("[makeOAuthTokenRequest]: URL creation error")
             return nil
         }
         var request = URLRequest(url: url)
