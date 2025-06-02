@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftKeychainWrapper
 
 final class OAuth2TokenStorage {
     private enum Keys: String {
@@ -13,13 +14,17 @@ final class OAuth2TokenStorage {
     }
     
     static let shared = OAuth2TokenStorage()
-    private let storage: UserDefaults = .standard
+    private let storage: KeychainWrapper = .standard
     
     var token: String? {
         get {
             storage.string(forKey: Keys.accessToken.rawValue)
         }
         set {
+            guard let newValue else {
+                storage.removeObject(forKey: Keys.accessToken.rawValue)
+                return
+            }
             storage.set(newValue, forKey: Keys.accessToken.rawValue)
         }
     }

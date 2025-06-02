@@ -7,14 +7,11 @@
 
 import UIKit
 import SnapKit
+import Kingfisher
 
 final class ProfileViewController: UIViewController {
     private enum Constants {
-        static let userPickImageName = "userpick"
         static let exitImageName = "exit"
-        static let usernameText = "Екатерина Новикова"
-        static let usertagText = "@ekaterina_nov"
-        static let descriptionText = "Hello, world!"
     }
     
     private let mainVStack: UIStackView = {
@@ -32,9 +29,8 @@ final class ProfileViewController: UIViewController {
     }()
     
     private let userPickImageView: UIImageView = {
-        let imageView = UIImageView(image: UIImage(named: Constants.userPickImageName))
+        let imageView = UIImageView()
         imageView.contentMode = .scaleAspectFit
-        imageView.layer.cornerRadius = 16
         return imageView
     }()
     
@@ -47,7 +43,6 @@ final class ProfileViewController: UIViewController {
     
     private let usernameLabel: UILabel = {
         let label = UILabel()
-        label.text = Constants.usernameText
         label.font = .systemFont(ofSize: 23)
         label.textAlignment = .left
         label.textColor = .ypWhite
@@ -56,7 +51,6 @@ final class ProfileViewController: UIViewController {
     
     private let userTagLabel: UILabel = {
         let label = UILabel()
-        label.text = Constants.usertagText
         label.font = .systemFont(ofSize: 13)
         label.textAlignment = .left
         label.textColor = .ypGray
@@ -65,16 +59,45 @@ final class ProfileViewController: UIViewController {
     
     private let descriptionLabel: UILabel = {
         let label = UILabel()
-        label.text = Constants.descriptionText
         label.font = .systemFont(ofSize: 13)
         label.textAlignment = .left
         label.textColor = .ypWhite
         return label
     }()
     
+    private let profileService = ProfileService.shared
+    private let profileImageService = ProfileImageService.shared
+    private let oauth2TokenStorage = OAuth2TokenStorage.shared
+    private var profileImageServiceObserver: NSObjectProtocol?
+    
     override func viewDidLoad() {
         super.viewDidLoad()
+
         setupUI()
+        
+        guard let profile = profileService.profile else {
+            print("No saved profile")
+            return
+        }
+        
+        updateUserInfo(profile: profile)
+        
+        profileImageServiceObserver = NotificationCenter.default
+            .addObserver(
+                forName: ProfileImageService.didChangeNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                guard let self else { return }
+                updateAvatar()
+            }
+        updateAvatar()
+    }
+    
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        userPickImageView.layer.cornerRadius = userPickImageView.frame.width / 2
+        userPickImageView.clipsToBounds = true
     }
     
     @objc func logoutTap(_ sender: Any) {
@@ -84,6 +107,7 @@ final class ProfileViewController: UIViewController {
 
 private extension ProfileViewController {
     func setupUI() {
+        view.backgroundColor = UIColor(resource: .ypBlack)
         view.addSubview(mainVStack)
         mainVStack.addArrangedSubview(hStack)
         mainVStack.addArrangedSubview(usernameLabel)
@@ -102,5 +126,27 @@ private extension ProfileViewController {
         userPickImageView.snp.makeConstraints { make in
             make.height.width.equalTo(70)
         }
+    }
+    
+    func updateUserInfo(profile: Profile) {
+        usernameLabel.text = profile.name
+        userTagLabel.text = profile.loginName
+        descriptionLabel.text = profile.bio ?? ""
+    }
+    
+    func updateAvatar() {
+        guard
+            let profileImageURL = ProfileImageService.shared.avatarURL,
+            let url = URL(string: profileImageURL)
+        else {
+            print("Invalid profileImageURL")
+            return
+        }
+        
+        let processor = RoundCornerImageProcessor(cornerRadius: 16)
+        userPickImageView.kf.indicatorType = .activity
+        userPickImageView.kf.setImage(with: url,
+                                      placeholder: UIImage(resource: .placeholder),
+                                      options: [.processor(processor)])
     }
 }

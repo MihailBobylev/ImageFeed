@@ -60,7 +60,9 @@ private extension AuthViewController {
     }
     
     func fetchOAuthToken(_ code: String) {
+        UIBlockingProgressHUD.show()
         oauth2Service.fetchOAuthToken(code) { [weak self] result in
+            UIBlockingProgressHUD.dismiss()
             guard let self else { return }
             switch result {
             case let .success(token):
@@ -68,6 +70,7 @@ private extension AuthViewController {
                 delegate?.authViewController(self, didAuthenticateWithCode: code)
             case let .failure(error):
                 print("Error: \(error.localizedDescription)")
+                AlertPresenter.showNetworkError(in: self)
             }
         }
     }
