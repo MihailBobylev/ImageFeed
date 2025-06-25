@@ -6,30 +6,19 @@
 //
 
 import UIKit
+import Kingfisher
 
 final class SingleImageViewController: UIViewController {
     @IBOutlet weak var scrollView: UIScrollView!
     @IBOutlet weak var imageView: UIImageView!
     
-    var image: UIImage? {
-        didSet {
-            guard isViewLoaded, let image else { return }
-
-            imageView.image = image
-            imageView.frame.size = image.size
-            rescaleAndCenterImageInScrollView(image: image)
-        }
-    }
+    var fullImageURLString: String?
     
     override func viewDidLoad() {
         super.viewDidLoad()
         scrollView.minimumZoomScale = 0.1
         scrollView.maximumZoomScale = 1.25
-
-        guard let image else { return }
-        imageView.image = image
-        imageView.frame.size = image.size
-        rescaleAndCenterImageInScrollView(image: image)
+        loadImageFromUrl()
     }
     
     @IBAction func didTapBackButton(_ sender: Any) {
@@ -37,7 +26,7 @@ final class SingleImageViewController: UIViewController {
     }
     
     @IBAction func didTapShareButton(_ sender: Any) {
-        guard let image else { return }
+        guard let image = imageView.image else { return }
         let share = UIActivityViewController(
             activityItems: [image],
             applicationActivities: nil
@@ -53,17 +42,40 @@ extension SingleImageViewController: UIScrollViewDelegate {
 }
 
 private extension SingleImageViewController {
+    func loadImageFromUrl() {
+        guard let fullImageURLString, let fullImageURL = URL(string: fullImageURLString) else { return }
+        UIBlockingProgressHUD.show()
+        imageView.kf.setImage(with: fullImageURL) { [weak self] result in
+            UIBlockingProgressHUD.dismiss()
+            
+            guard let self else { return }
+            switch result {
+            case .success(let imageResult):
+                rescaleAndCenterImageInScrollView(image: imageResult.image)
+            case .failure(let error):
+                print("[loadImageFromUrl]: \(error.localizedDescription)")
+                AlertPresenter.showSingleImageLoadError(in: self) { [weak self] in
+                    self?.loadImageFromUrl()
+                }
+            }
+        }
+    }
+    
     func rescaleAndCenterImageInScrollView(image: UIImage) {
+        view.layoutIfNeeded()
+        
         let minZoomScale = scrollView.minimumZoomScale
         let maxZoomScale = scrollView.maximumZoomScale
-        view.layoutIfNeeded()
         let visibleRectSize = scrollView.bounds.size
-        let imageSize = image.size
+        let imageSize = imageView.bounds.size
+
         let hScale = visibleRectSize.width / imageSize.width
         let vScale = visibleRectSize.height / imageSize.height
         let scale = min(maxZoomScale, max(minZoomScale, min(hScale, vScale)))
+        
         scrollView.setZoomScale(scale, animated: false)
         scrollView.layoutIfNeeded()
+        
         let newContentSize = scrollView.contentSize
         let x = (newContentSize.width - visibleRectSize.width) / 2
         let y = (newContentSize.height - visibleRectSize.height) / 2
