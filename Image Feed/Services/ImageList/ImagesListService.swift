@@ -18,9 +18,7 @@ final class ImagesListService {
     private var myTask: URLSessionTask?
     
     func fetchPhotosNextPage(authToken: String) {
-        guard myTask == nil else { return }
-        
-        guard let request = makeImagesListRequest(nextPage: page, authToken: authToken) else { return }
+        guard myTask == nil, let request = makeImagesListRequest(nextPage: page, authToken: authToken) else { return }
         let task = URLSession.shared.objectTask(for: request) { [weak self] (result: Result<[PhotoResult], Error>) in
             guard let self else { return }
             switch result {
@@ -40,10 +38,8 @@ final class ImagesListService {
                                  isLiked: photoResult.likedByUser)
                 })
                 
-                DispatchQueue.main.async {
-                    self.photos.append(contentsOf: resultPhotos)
-                    NotificationCenter.default.post(name: ImagesListService.didChangeNotification, object: self)
-                }
+                self.photos.append(contentsOf: resultPhotos)
+                NotificationCenter.default.post(name: ImagesListService.didChangeNotification, object: self)
             case .failure(let error):
                 if let error = error as? NetworkError {
                     switch error {

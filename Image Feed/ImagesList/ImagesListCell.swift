@@ -6,11 +6,6 @@ protocol ImagesListCellDelegate: AnyObject {
 }
 
 final class ImagesListCell: UITableViewCell {
-    private enum Constants {
-        static let likeActiveImageName = "like_button_on"
-        static let likeInactiveImageName = "like_button_off"
-    }
-    
     static let reuseIdentifier = "ImagesListCell"
     
     @IBOutlet var cellImage: UIImageView!
@@ -30,14 +25,14 @@ final class ImagesListCell: UITableViewCell {
         removeGradientLayer()
     }
     
-    @IBAction func changeLikeTap(_ sender: Any) {
+    @IBAction private func changeLikeTap(_ sender: Any) {
         delegate?.imageListCellDidTapLike(self)
     }
 }
 
 extension ImagesListCell {
     func setIsLiked(isLiked: Bool) {
-        let likeImage = isLiked ? UIImage(named: Constants.likeActiveImageName) : UIImage(named: Constants.likeInactiveImageName)
+        let likeImage = isLiked ? UIImage(resource: .likeButtonOn) : UIImage(resource: .likeButtonOff)
         likeButton.setImage(likeImage, for: .normal)
     }
     
