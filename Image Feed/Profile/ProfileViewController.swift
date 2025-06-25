@@ -69,19 +69,14 @@ final class ProfileViewController: UIViewController {
     private let profileImageService = ProfileImageService.shared
     private let oauth2TokenStorage = OAuth2TokenStorage.shared
     private var profileImageServiceObserver: NSObjectProtocol?
+    private var userPickAnimationLayer: CALayer?
+    private var animationLayers = Set<CALayer>()
+    private var isGradientAdded = false
     
     override func viewDidLoad() {
         super.viewDidLoad()
 
         setupUI()
-        
-        guard let profile = profileService.profile else {
-            print("No saved profile")
-            return
-        }
-        
-        updateUserInfo(profile: profile)
-        
         profileImageServiceObserver = NotificationCenter.default
             .addObserver(
                 forName: ProfileImageService.didChangeNotification,
@@ -91,17 +86,36 @@ final class ProfileViewController: UIViewController {
                 guard let self else { return }
                 updateAvatar()
             }
-        updateAvatar()
     }
     
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         userPickImageView.layer.cornerRadius = userPickImageView.frame.width / 2
         userPickImageView.clipsToBounds = true
+        
+        if !isGradientAdded {
+            makeGradientLayer()
+            isGradientAdded = true
+        }
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        
+        guard let profile = profileService.profile else {
+            print("[ProfileViewController.viewDidAppear]: No saved profile")
+            return
+        }
+        
+        updateUserInfo(profile: profile)
+        removeGradientPlaceholder()
+        updateAvatar()
     }
     
     @objc func logoutTap(_ sender: Any) {
-        print("logoutTap")
+        AlertPresenter.showLogoutAlert(in: self) {
+            ProfileLogoutService.shared.logout()
+        }
     }
 }
 
@@ -139,14 +153,70 @@ private extension ProfileViewController {
             let profileImageURL = ProfileImageService.shared.avatarURL,
             let url = URL(string: profileImageURL)
         else {
-            print("Invalid profileImageURL")
+            print("[updateAvatar]: Invalid profileImageURL")
             return
         }
         
         let processor = RoundCornerImageProcessor(cornerRadius: 16)
         userPickImageView.kf.indicatorType = .activity
         userPickImageView.kf.setImage(with: url,
-                                      placeholder: UIImage(resource: .placeholder),
-                                      options: [.processor(processor)])
+                                      options: [.processor(processor)]) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success:
+                userPickAnimationLayer?.removeFromSuperlayer()
+                userPickAnimationLayer = nil
+            case .failure(let error):
+                print("[updateAvatar]: \(error)")
+            }
+        }
+    }
+    
+    func makeGradientLayer() {
+        userPickAnimationLayer = addGradientPlaceholder(to: userPickImageView,
+                                                        in: CGRect(origin: .zero, size: CGSize(width: 70, height: 70)),
+                                                        withRadius: 35)
+        animationLayers.insert(addGradientPlaceholder(to: usernameLabel,
+                                                      in: CGRect(origin: .zero, size: CGSize(width: 223, height: 18)),
+                                                      withRadius: 9))
+        animationLayers.insert(addGradientPlaceholder(to: userTagLabel,
+                                                      in: CGRect(origin: CGPoint(x: 0, y: 20), size: CGSize(width: 89, height: 18)),
+                                                      withRadius: 9))
+        animationLayers.insert(addGradientPlaceholder(to: descriptionLabel,
+                                                      in: CGRect(origin: CGPoint(x: 0, y: 40), size: CGSize(width: 67, height: 18)),
+                                                      withRadius: 9))
+    }
+    
+    func addGradientPlaceholder(to view: UIView, in rect: CGRect, withRadius radius: CGFloat) -> CAGradientLayer {
+        let gradient = CAGradientLayer()
+        gradient.frame = rect
+        gradient.locations = [0, 0.1, 0.3]
+        gradient.colors = [
+            UIColor(red: 0.682, green: 0.686, blue: 0.706, alpha: 1).cgColor,
+            UIColor(red: 0.531, green: 0.533, blue: 0.553, alpha: 1).cgColor,
+            UIColor(red: 0.431, green: 0.433, blue: 0.453, alpha: 1).cgColor
+        ]
+        gradient.startPoint = CGPoint(x: 0, y: 0.5)
+        gradient.endPoint = CGPoint(x: 1, y: 0.5)
+        gradient.cornerRadius = radius
+        gradient.masksToBounds = true
+        
+        let gradientChangeAnimation = CABasicAnimation(keyPath: "locations")
+        gradientChangeAnimation.duration = 1.0
+        gradientChangeAnimation.repeatCount = .infinity
+        gradientChangeAnimation.fromValue = [0, 0.1, 0.3]
+        gradientChangeAnimation.toValue = [0, 0.8, 1]
+        gradient.add(gradientChangeAnimation, forKey: "locationsChange")
+        
+        view.layer.addSublayer(gradient)
+        
+        return gradient
+    }
+    
+    func removeGradientPlaceholder() {
+        animationLayers.forEach { gradLayer in
+            gradLayer.removeFromSuperlayer()
+        }
+        animationLayers.removeAll()
     }
 }

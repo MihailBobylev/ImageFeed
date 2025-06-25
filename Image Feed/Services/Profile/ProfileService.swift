@@ -69,6 +69,10 @@ final class ProfileService {
         myTask = task
         task.resume()
     }
+    
+    func cleanProfileInfo() {
+        profile = nil
+    }
 }
 
 private extension ProfileService {
