@@ -7,7 +7,14 @@
 
 import UIKit
 
-final class AlertPresenter {
+public protocol AlertPresenterProtocol {
+    static func showNetworkError(in viewController: UIViewController)
+    static func showChangeLikeError(in viewController: UIViewController)
+    static func showSingleImageLoadError(in viewController: UIViewController, completion: @escaping () -> Void)
+    static func showLogoutAlert(in viewController: UIViewController, completion: @escaping () -> Void)
+}
+
+final class AlertPresenter: AlertPresenterProtocol {
     static func showNetworkError(in viewController: UIViewController) {
         let alert = UIAlertController(
             title: "Что-то пошло не так",
